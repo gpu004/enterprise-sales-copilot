@@ -29,3 +29,7 @@ frontend/.vercel/
 .idea/
 .vscode/
 *.log
+
+.hypothesis/
+.hegel/
+*.tsbuildinfo

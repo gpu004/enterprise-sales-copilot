@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 from backend.models import TranscriptUpdate
 
@@ -36,6 +36,8 @@ class ConversationManager:
 
     def get_recent_context(self, max_chars: int = 2000) -> str:
         """Return recent final transcript text, trimmed to *max_chars* from the end."""
+        if max_chars <= 0:
+            return ""
         parts = [s.text for s in self._segments if s.is_final]
         combined = " ".join(parts)
         if len(combined) > max_chars:
@@ -51,7 +53,12 @@ class ConversationManager:
         """Remove segments older than the buffer duration and drop stale dedup keys."""
         if not self._segments:
             return
-        cutoff = datetime.utcnow() - self._buffer_duration
-        self._segments = [s for s in self._segments if s.timestamp >= cutoff]
+        cutoff = datetime.now(UTC) - self._buffer_duration
+        self._segments = [
+            s
+            for s in self._segments
+            if (s.timestamp.replace(tzinfo=UTC) if s.timestamp.tzinfo is None else s.timestamp)
+            >= cutoff
+        ]
         live = {s.text.strip() for s in self._segments if s.is_final}
         self._processed_text &= live
