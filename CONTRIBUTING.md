@@ -34,3 +34,17 @@ Expect peer review. Prefer small dependency additions and Apache 2.0 / BSD / MIT
 ## License
 
 By contributing you agree to the project [LICENSE](LICENSE.txt) and the Salesforce CLA.
+
+## Property tests
+
+Run `uv sync --locked` and `uv run pytest -q` from the repository root.
+Backend Hypothesis properties cover transcript operation sequences and character
+budgets, timezone handling, fenced JSON parsing, LLM response validation, and
+parameterized SQLite queries against temporary databases. No API keys are needed.
+
+In `frontend`, run `bun install --frozen-lockfile` and `bun run test`.
+[Hegel](https://github.com/hegeldev/hegel-typescript) generates talk-ratio cases;
+fast-check checks that splitting speech into segments preserves those ratios.
+Use Node 22 or a supported Bun runtime. Both suites run on pull requests.
+Generated example caches are ignored; keep regression assertions in the tests.
+These tests exercise local logic, not live transcription or model-provider behavior.

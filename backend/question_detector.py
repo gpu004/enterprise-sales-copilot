@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import math
+
 from backend.llm_parse import parse_json
 from backend.models import DetectedQuestion
 
@@ -38,11 +40,18 @@ class QuestionDetector:
             user_prompt=recent_transcript,
         )
         data = parse_json(raw)
-        if not data or not data.get("detected"):
+        if not isinstance(data, dict) or data.get("detected") is not True:
             return None
 
-        return DetectedQuestion(
-            question=data.get("question", ""),
-            category=data.get("category", "general"),
-            confidence=float(data.get("confidence", 0.0)),
-        )
+        question = data.get("question")
+        category = data.get("category", "general")
+        if not isinstance(question, str) or not question.strip() or not isinstance(category, str):
+            return None
+        try:
+            confidence = float(data.get("confidence", 0.0))
+        except (TypeError, ValueError, OverflowError):
+            return None
+        if not math.isfinite(confidence) or not 0 <= confidence <= 1:
+            return None
+
+        return DetectedQuestion(question=question, category=category, confidence=confidence)
