@@ -20,7 +20,7 @@ export function TextInput({ onSend, disabled = false }: TextInputProps) {
   return (
     <form
       onSubmit={handleSubmit}
-      className="glass-strong border-t border-border px-4 sm:px-5 py-3 flex gap-3 shrink-0"
+      className="px-3 sm:px-5 pb-4 pt-1 flex gap-2 sm:gap-3 shrink-0"
       aria-label="Send a customer question"
     >
       <div className="flex-1 min-w-0">
@@ -32,18 +32,18 @@ export function TextInput({ onSend, disabled = false }: TextInputProps) {
           type="text"
           value={value}
           onChange={(e) => setValue(e.target.value)}
-          placeholder={disabled ? 'Connect to send questions…' : 'Type a customer question…'}
+          placeholder={disabled ? 'Connect to try a question…' : 'Try a customer question without the mic…'}
           disabled={disabled}
           autoComplete="off"
-          className="w-full min-h-[44px] rounded-xl border border-border bg-white/5 px-4 py-2.5 text-sm text-text-primary placeholder:text-text-muted transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary/40 focus:bg-white/[0.07] disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full min-h-[44px] rounded-md border border-rule bg-sheet-raised px-3.5 py-2.5 text-sm text-ink placeholder:text-quiet transition-colors focus:outline-none focus:ring-2 focus:ring-mark/25 focus:border-mark disabled:opacity-50 disabled:cursor-not-allowed"
         />
       </div>
       <button
         type="submit"
         disabled={disabled || !value.trim()}
-        className="min-h-[44px] px-5 btn-primary-glow text-white text-sm font-semibold rounded-xl transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+        className="min-h-[44px] px-4 sm:px-5 bg-ink text-sheet-raised text-sm font-semibold rounded-md hover:bg-ink/90 transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
       >
-        Send
+        Ask
       </button>
     </form>
   );

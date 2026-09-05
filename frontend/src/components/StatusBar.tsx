@@ -34,14 +34,7 @@ function StopIcon({ className }: { className?: string }) {
   );
 }
 
-export function StatusBar({
-  isConnected,
-  isCapturing,
-  isDemoRunning,
-  onToggleMic,
-  onStartDemo,
-  onStopDemo,
-}: StatusBarProps) {
+function LiveTimer({ label }: { label: string }) {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
@@ -54,81 +47,87 @@ export function StatusBar({
   const timer = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
 
   return (
-    <header className="glass-strong border-b border-border px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 gap-4 animate-panel-enter">
-      <div className="flex items-center gap-3 min-w-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="w-9 h-9 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgb(94_106_210/0.2)]"
-            aria-hidden="true"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" className="w-4.5 h-4.5 text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5z" />
-              <path d="M2 17l10 5 10-5" />
-              <path d="M2 12l10 5 10-5" />
-            </svg>
-          </div>
-          <div className="min-w-0">
-            <h1 className="text-base font-bold tracking-tight truncate gradient-text">
-              Sales Copilot
-            </h1>
-            <p className="text-[11px] text-text-muted tabular-nums hidden sm:block">
-              Session · <span className="metric-value">{timer}</span>
-            </p>
-          </div>
+    <span
+      className="inline-flex items-center gap-1.5 text-[13px] font-medium text-live tabular-nums"
+      role="status"
+      aria-live="polite"
+    >
+      <span className="w-1.5 h-1.5 rounded-full bg-live animate-live-dot" aria-hidden="true" />
+      {label} · {timer}
+    </span>
+  );
+}
+
+export function StatusBar({
+  isConnected,
+  isCapturing,
+  isDemoRunning,
+  onToggleMic,
+  onStartDemo,
+  onStopDemo,
+}: StatusBarProps) {
+  const isLive = isCapturing || isDemoRunning;
+
+  return (
+    <header className="px-4 sm:px-5 pt-4 pb-3 flex items-end justify-between shrink-0 gap-4">
+      <div className="min-w-0">
+        <div className="flex items-baseline gap-3 flex-wrap">
+          <h1 className="text-[1.6rem] sm:text-[1.75rem] font-semibold tracking-tight text-ink leading-none">
+            Sales Copilot
+          </h1>
+          {isLive ? (
+            <LiveTimer label={isCapturing ? 'Listening' : 'Demo'} />
+          ) : (
+            <span
+              className="inline-flex items-center gap-1.5 text-[13px] text-quiet"
+              role="status"
+              aria-live="polite"
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-live/50' : 'bg-stop animate-blink'}`}
+                aria-hidden="true"
+              />
+              {isConnected ? 'Ready' : 'Offline'}
+            </span>
+          )}
         </div>
       </div>
 
-      <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
-        <div
-          className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-lg glass-subtle text-xs font-medium"
-          role="status"
-          aria-live="polite"
-        >
-          <span
-            className={`w-2 h-2 rounded-full shrink-0 ${
-              isConnected ? 'bg-success shadow-[0_0_8px_rgb(34_197_94/0.5)]' : 'bg-danger animate-blink'
-            }`}
-            aria-hidden="true"
-          />
-          <span className="text-text-secondary">
-            {isConnected ? 'Connected' : 'Disconnected'}
-          </span>
-        </div>
-
+      <div className="flex items-center gap-2 shrink-0">
         {isDemoRunning ? (
           <button
             onClick={onStopDemo}
-            className="flex items-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer bg-danger/90 hover:bg-danger text-white border border-danger/50 focus-visible:outline-offset-[-2px]"
+            className="flex items-center gap-1.5 min-h-[40px] px-3 py-2 rounded-md text-sm font-medium cursor-pointer bg-stop text-white hover:bg-stop/90 transition-colors"
             aria-label="Stop demo playback"
           >
             <StopIcon className="w-4 h-4" />
-            <span className="hidden sm:inline">Stop Demo</span>
+            <span className="hidden sm:inline">Stop demo</span>
           </button>
         ) : (
           <button
             onClick={onStartDemo}
             disabled={!isConnected}
-            className="flex items-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer glass-subtle hover:bg-white/10 text-text-primary disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-offset-[-2px]"
+            className="flex items-center gap-1.5 min-h-[40px] px-3 py-2 rounded-md text-sm font-medium cursor-pointer bg-sheet-raised text-ink border border-rule hover:border-ink/25 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             aria-label="Start demo playback"
           >
-            <PlayIcon className="w-4 h-4" />
-            <span className="hidden sm:inline">Demo</span>
+            <PlayIcon className="w-4 h-4 text-mark" />
+            <span className="hidden sm:inline">Run demo</span>
           </button>
         )}
 
         <button
           onClick={onToggleMic}
           disabled={!isConnected}
-          className={`flex items-center gap-1.5 min-h-[44px] px-3.5 py-2 rounded-lg text-sm font-semibold transition-all duration-200 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed focus-visible:outline-offset-[-2px] ${
+          className={`flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 rounded-md text-sm font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${
             isCapturing
-              ? 'bg-danger/90 hover:bg-danger text-white border border-danger/50 animate-pulse-ring'
-              : 'btn-primary-glow text-white'
+              ? 'bg-stop text-white hover:bg-stop/90 animate-pulse-ring'
+              : 'bg-live text-white hover:bg-live/90'
           }`}
           aria-label={isCapturing ? 'Stop microphone capture' : 'Start microphone capture'}
           aria-pressed={isCapturing}
         >
           <MicIcon className="w-4 h-4" />
-          <span className="hidden sm:inline">{isCapturing ? 'Recording' : 'Start Mic'}</span>
+          <span className="hidden sm:inline">{isCapturing ? 'Stop mic' : 'Start mic'}</span>
         </button>
       </div>
     </header>

@@ -1,27 +1,25 @@
 import type { Metadata } from 'next';
-import { JetBrains_Mono, Plus_Jakarta_Sans } from 'next/font/google';
+import { IBM_Plex_Sans, IBM_Plex_Serif } from 'next/font/google';
 import './globals.css';
 
-const plusJakartaSans = Plus_Jakarta_Sans({
+const plexSans = IBM_Plex_Sans({
   subsets: ['latin'],
-  weight: ['400', '500', '600', '700', '800'],
-  style: ['normal', 'italic'],
-  variable: '--font-plus-jakarta',
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-plex-sans',
   display: 'swap',
 });
 
-const jetbrainsMono = JetBrains_Mono({
+const plexSerif = IBM_Plex_Serif({
   subsets: ['latin'],
   weight: ['400', '500', '600'],
-  variable: '--font-jetbrains-mono',
+  variable: '--font-plex-serif',
   display: 'swap',
 });
 
 export const metadata: Metadata = {
   title: 'Sales Copilot',
-  description: 'Enterprise Sales Copilot — real-time AI assistance on live sales calls',
+  description: 'Live call transcript with short product replies for sales reps',
   icons: { icon: '/favicon.svg' },
-  themeColor: '#020203',
 };
 
 export default function RootLayout({
@@ -30,8 +28,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${plusJakartaSans.variable} ${jetbrainsMono.variable}`}>
-      <body>{children}</body>
+    <html lang="en" className={`${plexSans.variable} ${plexSerif.variable}`}>
+      <body className="font-sans antialiased">{children}</body>
     </html>
   );
 }
