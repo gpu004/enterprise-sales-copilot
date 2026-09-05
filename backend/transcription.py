@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Awaitable, Callable
 
-from deepgram import DeepgramClient, LiveOptions, LiveTranscriptionEvents
+from deepgram import DeepgramClient, DeepgramClientOptions, LiveOptions, LiveTranscriptionEvents
 
 from backend.config import settings
 from backend.models import TranscriptUpdate
@@ -18,7 +18,9 @@ class DeepgramTranscriber:
 
     def __init__(self, api_key: str | None = None):
         self._api_key = api_key or settings.deepgram_api_key
-        self._client = DeepgramClient(self._api_key)
+        self._client = DeepgramClient(
+            self._api_key, DeepgramClientOptions(options={"keepalive": "true"})
+        )
         self._connection = None
 
     async def start(
@@ -29,6 +31,8 @@ class DeepgramTranscriber:
         self._connection = self._client.listen.asynclive.v("1")
 
         async def _on_message(_conn, result, **_kwargs):
+            if not result.channel.alternatives:
+                return
             transcript = result.channel.alternatives[0].transcript
             if not transcript:
                 return
@@ -54,17 +58,27 @@ class DeepgramTranscriber:
             sample_rate=16000,
         )
 
-        if not await self._connection.start(options):
-            raise RuntimeError("Failed to start Deepgram live connection")
+        try:
+            if not await self._connection.start(options):
+                raise RuntimeError("Failed to start Deepgram live connection")
+            if not await self._connection.is_connected():
+                raise RuntimeError("Deepgram live connection is not ready")
+        except BaseException:
+            await self.stop()
+            raise
 
     async def send_audio(self, audio_bytes: bytes) -> None:
         """Send an audio chunk to Deepgram."""
         if self._connection is None:
             raise RuntimeError("Connection not started — call start() first")
-        await self._connection.send(audio_bytes)
+        if not await self._connection.is_connected():
+            raise RuntimeError("Deepgram live connection is closed")
+        if not await self._connection.send(audio_bytes):
+            raise RuntimeError("Failed to send audio to Deepgram")
 
     async def stop(self) -> None:
         """Close the Deepgram connection."""
         if self._connection is not None:
-            await self._connection.finish()
+            connection = self._connection
             self._connection = None
+            await connection.finish()

@@ -40,6 +40,7 @@ function applyTranscript(
 }
 
 export function useWebSocket() {
+  const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [transcripts, setTranscripts] = useState<TranscriptUpdate[]>([]);
   const [suggestions, setSuggestions] = useState<SuggestionCard[]>([]);
@@ -50,23 +51,25 @@ export function useWebSocket() {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
   const mountedRef = useRef(true);
   const endpointRef = useRef<Endpoint>('session');
-  const pendingEndpoint = useRef<Endpoint | null>(null);
+  const playbackRef = useRef<AbortController | null>(null);
 
-  const connect = useCallback((endpoint: Endpoint = 'session') => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) return;
+  const connect = useCallback(function connect(endpoint: Endpoint = 'session') {
+    if (!mountedRef.current || wsRef.current) return;
     endpointRef.current = endpoint;
 
     const wsPath = endpoint === 'demo' ? '/ws/demo' : '/ws/session';
     const ws = new WebSocket(`${backendWsBase()}${wsPath}`);
 
+    let playbackDone = Promise.resolve();
+
     ws.onopen = () => {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || wsRef.current !== ws) return;
       setIsConnected(true);
       reconnectDelay.current = INITIAL_RECONNECT_DELAY;
     };
 
     ws.onmessage = (event) => {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || wsRef.current !== ws) return;
       try {
         const msg = JSON.parse(event.data) as WSMessage;
         switch (msg.type) {
@@ -77,24 +80,34 @@ export function useWebSocket() {
             setSuggestions((prev) => [msg.payload, ...prev]);
             break;
           case 'audio_play': {
-            const advance = () => {
-              if (endpointRef.current === 'demo' && mountedRef.current) {
-                wsSend(wsRef.current, { type: 'demo_next' });
-              }
-            };
-            if (msg.payload.audio && endpointRef.current === 'demo') {
-              playAudio(msg.payload.audio, msg.payload.speaker).then(advance);
-            } else if (endpointRef.current === 'demo') {
-              advance();
+            if (msg.payload.audio && endpoint === 'demo') {
+              playbackRef.current?.abort();
+              const playback = new AbortController();
+              playbackRef.current = playback;
+              playbackDone = playAudio(msg.payload.audio, msg.payload.speaker, playback.signal);
             }
             break;
           }
+          case 'error':
+            setError(msg.payload.message);
+            break;
           case 'status':
+            if (msg.payload.message === 'turn_complete' && endpoint === 'demo') {
+              void playbackDone.then(() => {
+                if (mountedRef.current && wsRef.current === ws) {
+                  wsSend(ws, { type: 'demo_next' });
+                }
+              });
+            }
             if (msg.payload.message === 'demo_started') {
               setIsDemoRunning(true);
               wsSend(ws, { type: 'demo_next' });
             }
-            if (msg.payload.message === 'demo_ended') setIsDemoRunning(false);
+            if (msg.payload.message === 'demo_ended') {
+              setIsDemoRunning(false);
+              endpointRef.current = 'session';
+              ws.close();
+            }
             break;
         }
       } catch {
@@ -103,17 +116,12 @@ export function useWebSocket() {
     };
 
     ws.onclose = () => {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || wsRef.current !== ws) return;
       setIsConnected(false);
       setIsDemoRunning(false);
       wsRef.current = null;
 
-      const next = pendingEndpoint.current;
-      pendingEndpoint.current = null;
-      if (next) {
-        connect(next);
-        return;
-      }
+      playbackRef.current?.abort();
 
       if (endpointRef.current === 'session') {
         reconnectTimer.current = setTimeout(() => {
@@ -139,19 +147,21 @@ export function useWebSocket() {
     return () => {
       mountedRef.current = false;
       clearTimeout(reconnectTimer.current);
-      pendingEndpoint.current = null;
-      wsRef.current?.close();
+      const ws = wsRef.current;
+      wsRef.current = null;
+      playbackRef.current?.abort();
+      ws?.close();
     };
   }, [connect]);
 
   const sendAudio = useCallback((data: ArrayBuffer) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+    if (endpointRef.current === 'session' && wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(data);
     }
   }, []);
 
   const sendText = useCallback((text: string) => {
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
+    if (endpointRef.current === 'session' && wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'text_input', text }));
     }
   }, []);
@@ -163,15 +173,15 @@ export function useWebSocket() {
   const switchEndpoint = useCallback(
     (endpoint: Endpoint) => {
       clearTimeout(reconnectTimer.current);
+      setError(null);
       setTranscripts([]);
       setSuggestions([]);
-      pendingEndpoint.current = endpoint;
-      if (wsRef.current) {
-        wsRef.current.close();
-      } else {
-        pendingEndpoint.current = null;
-        connect(endpoint);
-      }
+      const ws = wsRef.current;
+      wsRef.current = null;
+      playbackRef.current?.abort();
+      ws?.close();
+      setIsConnected(false);
+      connect(endpoint);
     },
     [connect],
   );
@@ -182,15 +192,12 @@ export function useWebSocket() {
   }, [switchEndpoint]);
 
   const stopDemo = useCallback(() => {
-    document.querySelectorAll('audio').forEach((a) => {
-      a.pause();
-      a.remove();
-    });
     setIsDemoRunning(false);
     switchEndpoint('session');
   }, [switchEndpoint]);
 
   return {
+    error,
     isConnected,
     transcripts,
     suggestions,
