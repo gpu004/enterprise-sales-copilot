@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings
 
 
@@ -20,7 +21,9 @@ class Settings(BaseSettings):
     claude_bearer_token: str = ""  # For AWS Bedrock auth (optional, legacy)
 
     # Google Gemini
-    gemini_api_key: str = ""
+    gemini_api_key: str = Field(
+        default="", validation_alias=AliasChoices("gemini_api_key", "google_api_key")
+    )
 
     # PRISMtrace (live LLM traces). Auth header is X-PRISMtrace-Key, not Bearer.
     prismtrace_api_key: str = ""
