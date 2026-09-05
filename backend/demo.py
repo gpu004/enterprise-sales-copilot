@@ -56,7 +56,7 @@ DEMO_SCRIPT: list[tuple[Speaker, str | None]] = [
         "Well, I'm 32 years old with two kids. I want to make sure they're taken care of if anything happens to me. What term life options do you have?",
     ),
     ("sales", None),
-    ("customer", "How much does the 20-year term life insurance cost per month?"),
+    ("customer", "How much does SecureLife Premium Term 30 cost per month for a 32-year-old with a family?"),
     ("sales", None),
     ("customer", "And what's the coverage amount for that plan?"),
     ("sales", None),
@@ -234,5 +234,9 @@ async def run_demo(
             assert text is not None
             conversation.add_transcript(TranscriptUpdate(text=text, is_final=True, speaker="sales"))
             await _send_turn(ws, "sales", text)
+
+        await _send_json(
+            ws, WSMessage(type=WSMessageType.STATUS, payload={"message": "turn_complete"})
+        )
 
     await _send_json(ws, WSMessage(type=WSMessageType.STATUS, payload={"message": "demo_ended"}))

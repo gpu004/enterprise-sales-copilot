@@ -125,3 +125,19 @@ Other domain: replace `seed_data/insurance_products.json`.
 ## License
 
 Apache License 2.0. See [LICENSE](LICENSE) for details.
+
+## Deployed hackathon demo
+
+Open https://enterprise-sales-copilot-gamma.vercel.app and select Demo, or type a question. Live microphone mode requires browser microphone permission.
+
+The deployed LLM is Gemini `gemini-3.5-flash-lite`, traced through PRISMtrace. Set `GEMINI_API_KEY` or `GOOGLE_API_KEY`, `LLM_PROVIDER=gemini`, and `LLM_MODEL=gemini-3.5-flash-lite` in `credentials.env`. The OpenAI key previously returned an exhausted-credit error.
+
+After changing credentials, update the Modal secret and redeploy from the repository root:
+
+```bash
+uv run --with modal modal secret create sales-copilot --from-dotenv credentials.env --force
+uv run --with modal modal deploy backend/modal_app.py
+bunx vercel@latest --prod --yes
+```
+
+Run the Vercel command from the repository root because the linked project uses `frontend` as its root directory. PRISMtrace is LLM tracing; this repository uses SQLite directly and does not include Prisma ORM.

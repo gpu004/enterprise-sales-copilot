@@ -117,7 +117,7 @@ export function StatusBar({
 
         <button
           onClick={onToggleMic}
-          disabled={!isConnected}
+          disabled={(!isConnected || isDemoRunning) && !isCapturing}
           className={`flex items-center gap-1.5 min-h-[40px] px-3.5 py-2 rounded-md text-sm font-semibold cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed transition-colors ${
             isCapturing
               ? 'bg-stop text-white hover:bg-stop/90 animate-pulse-ring'

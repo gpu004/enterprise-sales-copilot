@@ -57,6 +57,7 @@ export default function App() {
   const preview = searchParams.get('preview') === '1';
 
   const {
+    error,
     isConnected,
     transcripts,
     suggestions,
@@ -80,6 +81,11 @@ export default function App() {
     }
   }, [isCapturing, startCapture, stopCapture]);
 
+  const handleStartDemo = useCallback(() => {
+    stopCapture();
+    startDemo();
+  }, [stopCapture, startDemo]);
+
   const shownTranscripts =
     preview && transcripts.length === 0 ? PREVIEW_TRANSCRIPTS : transcripts;
   const shownSuggestions =
@@ -92,9 +98,11 @@ export default function App() {
         isCapturing={isCapturing}
         isDemoRunning={isDemoRunning}
         onToggleMic={handleToggleMic}
-        onStartDemo={startDemo}
+        onStartDemo={handleStartDemo}
         onStopDemo={stopDemo}
       />
+
+      {error && <p role="alert" className="mx-4 mb-3 text-sm text-stop">{error}</p>}
 
       <main className="flex flex-1 min-h-0 flex-col lg:flex-row gap-px bg-rule mx-3 mb-3 rounded-md overflow-hidden border border-rule shadow-[0_1px_0_rgb(27_40_56/0.04)]">
         <section
@@ -115,7 +123,7 @@ export default function App() {
         </section>
       </main>
 
-      <TextInput onSend={sendText} disabled={!isConnected} />
+      <TextInput onSend={sendText} disabled={!isConnected || isDemoRunning} />
     </div>
   );
 }

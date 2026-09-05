@@ -12,6 +12,8 @@ import asyncio
 import logging
 import os
 
+import httpx
+
 from backend.config import settings
 
 logger = logging.getLogger(__name__)
@@ -50,7 +52,7 @@ class LLMClient:
         if settings.openai_base_url:
             # Custom gateway (e.g., Salesforce Research Gateway)
             kwargs["base_url"] = settings.openai_base_url
-            kwargs["api_key"] = "dummy"
+            kwargs["api_key"] = settings.openai_api_key
             kwargs["default_headers"] = {"X-Api-Key": settings.openai_api_key}
         elif settings.prismtrace_api_key:
             # Zero-code PRISM proxy: traces model calls without call-site changes.
@@ -89,20 +91,21 @@ class LLMClient:
             self._use_bedrock = False
 
     def _init_gemini(self):
-        from google import genai
-
-        kwargs: dict = {"api_key": settings.gemini_api_key}
+        self._gemini_proxy_url = None
         if settings.prismtrace_api_key:
-            # google-genai: route via PRISM Gemini proxy when tracing is enabled.
+            # PRISM accepts messages and returns content blocks, not Gemini's native schema.
             host = settings.prismtrace_host.rstrip("/")
-            kwargs["http_options"] = {
-                "base_url": f"{host}/proxy/gemini",
-                "headers": {
-                    "X-PRISMtrace-Key": settings.prismtrace_api_key,
-                    "x-api-key": settings.gemini_api_key,
-                },
+            self._gemini_proxy_url = (
+                f"{host}/proxy/gemini/v1beta/models/{self.model}:generateContent"
+            )
+            self._gemini_proxy_headers = {
+                "X-PRISMtrace-Key": settings.prismtrace_api_key,
+                "x-api-key": settings.gemini_api_key,
             }
-        self._gemini_client = genai.Client(**kwargs)
+        else:
+            from google import genai
+
+            self._gemini_client = genai.Client(api_key=settings.gemini_api_key)
 
     async def complete(
         self,
@@ -159,7 +162,7 @@ class LLMClient:
             temperature=temperature,
             max_tokens=max_tokens,
         )
-        return response.content[0].text or ""
+        return "".join(block.text for block in response.content if block.type == "text")
 
     async def _complete_bedrock(
         self,
@@ -176,7 +179,9 @@ class LLMClient:
             system=[{"text": system_prompt}],
             inferenceConfig={"maxTokens": max_tokens, "temperature": temperature},
         )
-        return response["output"]["message"]["content"][0]["text"]
+        return "".join(
+            block["text"] for block in response["output"]["message"]["content"] if "text" in block
+        )
 
     async def _complete_gemini(
         self,
@@ -185,6 +190,28 @@ class LLMClient:
         temperature: float,
         max_tokens: int,
     ) -> str:
+        if self._gemini_proxy_url:
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    self._gemini_proxy_url,
+                    headers=self._gemini_proxy_headers,
+                    json={
+                        "model": self.model,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": user_prompt},
+                        ],
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                    },
+                )
+                response.raise_for_status()
+                return "".join(
+                    block["text"]
+                    for block in response.json()["content"]
+                    if block.get("type") == "text"
+                )
+
         from google.genai import types
 
         response = await asyncio.to_thread(

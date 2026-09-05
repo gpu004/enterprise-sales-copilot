@@ -121,6 +121,16 @@ async def websocket_demo(ws: WebSocket):
         logger.info("Demo WebSocket disconnected")
     except Exception:
         logger.exception("Demo error")
+        await _send_json(
+            ws,
+            WSMessage(
+                type=WSMessageType.ERROR,
+                payload={
+                    "message": "Demo failed. Check the LLM provider quota and voice configuration."
+                },
+            ),
+        )
+        await ws.close(code=1011)
 
 
 @app.websocket("/ws/session")
@@ -130,16 +140,20 @@ async def websocket_session(ws: WebSocket):
     conversation = ConversationManager()
     transcriber: DeepgramTranscriber | None = None
 
-    if settings.deepgram_api_key:
-        transcriber = DeepgramTranscriber(settings.deepgram_api_key)
-
-        async def on_transcript(update: TranscriptUpdate):
-            try:
-                await process_transcript(update, ws, conversation)
-            except Exception:
-                logger.exception("Pipeline error in transcription callback")
-
-        await transcriber.start(on_transcript)
+    async def on_transcript(update: TranscriptUpdate):
+        try:
+            await process_transcript(update, ws, conversation)
+        except Exception:
+            logger.exception("Pipeline error in transcription callback")
+            await _send_json(
+                ws,
+                WSMessage(
+                    type=WSMessageType.ERROR,
+                    payload={
+                        "message": "Could not generate an answer. Check the LLM provider quota and configuration."
+                    },
+                ),
+            )
 
     await _send_json(
         ws,
@@ -149,17 +163,41 @@ async def websocket_session(ws: WebSocket):
     try:
         while True:
             data = await ws.receive()
-            if "bytes" in data and transcriber:
+            if data["type"] == "websocket.disconnect":
+                break
+            if data.get("bytes") is not None:
+                if not transcriber:
+                    if not settings.deepgram_api_key:
+                        await _send_json(
+                            ws,
+                            WSMessage(
+                                type=WSMessageType.ERROR,
+                                payload={
+                                    "message": "Microphone transcription requires a Deepgram API key. Text input is available."
+                                },
+                            ),
+                        )
+                        continue
+                    transcriber = DeepgramTranscriber(settings.deepgram_api_key)
+                    await transcriber.start(on_transcript)
                 await transcriber.send_audio(data["bytes"])
-            elif "text" in data:
+            elif data.get("text") is not None:
                 msg = json.loads(data["text"])
                 if msg.get("type") == "text_input":
                     update = TranscriptUpdate(text=msg["text"], is_final=True)
-                    await process_transcript(update, ws, conversation)
+                    await on_transcript(update)
     except WebSocketDisconnect:
         logger.info("WebSocket disconnected")
     except Exception:
         logger.exception("WebSocket error")
+        await _send_json(
+            ws,
+            WSMessage(
+                type=WSMessageType.ERROR,
+                payload={"message": "Voice connection failed. Reconnect or use text input."},
+            ),
+        )
+        await ws.close(code=1011)
     finally:
         if transcriber:
             try:
